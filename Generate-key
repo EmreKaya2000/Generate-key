@@ -1,0 +1,55 @@
+
+    key = Fernet.generate_key()
+
+    fernet_key = Fernet(key)
+
+    print(key)
+
+    userid = str(request.session['user_id'])
+    parentPath = userid + "/"
+    folderId = None
+    if len(request.POST['parent_id']) > 0:
+        folderId = int(request.POST['parent_id'])
+        parentPath = folder.objects.get(id=folderId).folder_link + "/"
+        parentPath = parentPath[10:]
+
+    for tempF in f:
+
+        #test = default_storage.open(tempF,'rb').read()
+        #print(test)
+
+        file_name = default_storage.save(parentPath + tempF.name, tempF)
+        file_url = default_storage.url(file_name)
+
+        print(file_name)
+        # dosyayi aciyoruz sifreleyip tekrar kaydediyoruz.
+        content = default_storage.open(file_name, 'rb').read()
+
+        #print(content.decode())
+
+        encrypted = fernet_key.encrypt(content)
+
+        #print(encrypted)
+        
+        # farkli algoritmalarda kullanabiliriz yada kendi algoritmamizi tasarlayip yapariz.
+        default_storage.open(file_name, 'wb').write(encrypted)
+
+        fi = files(user_id=userid,
+                   folder_id=folderId,
+                   file_title=tempF.name,
+                   file_size=str(default_storage.open(file_name).size),
+                   upload_date=date.today(),
+                   file_link=file_url,
+                   file_starred=False,
+                   file_hidden=False,
+                   unique_key=key.decode()).save()
+
+
+def file_provider(request):
+    if request.POST.__contains__('folder_id') and len(request.POST['folder_id']) > 0:
+        data = list(files.objects.filter(user_id=request.POST['user_id'], file_hidden=bool(request.POST['hidden']),
+                                         folder_id=request.POST['folder_id']).values())
+    else:
+        data = list(files.objects.filter(user_id=request.POST['user_id'], file_hidden=bool(request.POST['hidden']),
+                                         folder_id=None).values())
+    return JsonResponse(data, safe=False)
